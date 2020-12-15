@@ -1,1 +1,1 @@
-# sododu-solver
+# sudodu-solver
