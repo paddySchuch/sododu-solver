@@ -26,6 +26,8 @@ class SudokuBoard(object):
         self.show()
 
         while not self._is_solved():
+            print(f'iteration {self._iteration}')
+            self._sanity_check()
             success = self.iterate()
             if not success:
                 print('could not find any more. :-(')
@@ -47,10 +49,38 @@ class SudokuBoard(object):
             value = np.where(self._candidates[row, col])[0][0] + 1
             self.set_new_value(row, col, value)
             return True
+        # check single digits in block
+        if self._check_singles_in_block():
+            return True
+
         if self._find_locked_tuples():
             return True
 
         return False
+
+    def _check_singles_in_block(self):
+        for block_y in range(3):
+            slice_y = slice(block_y*3, (block_y+1)*3, None)
+            for block_x in range(3):
+                slice_x = slice(block_x * 3, (block_x + 1) * 3, None)
+                candidate_block = self._candidates[slice_y, slice_x]
+                values = np.where(candidate_block.sum(axis=(0, 1)) == 1)[0]
+                if len(values):
+                    value = values[0]
+                    row, col = np.where(candidate_block[:, :, value])
+                    idx_row = row[0] + block_y*3
+                    idx_col = col[0] + block_x*3
+                    self.set_new_value(row=idx_row, col=idx_col, value=value+1)
+                    return True
+        return False
+
+    def _sanity_check(self):
+        if (self._fixed.sum(axis=0) > 1).any():
+            raise Exception('riddle in bad state: same digits in a row')
+        if (self._fixed.sum(axis=1) > 1).any():
+            raise Exception('riddle in bad state: same digits in a col')
+        if (self._fixed.sum(axis=2) > 1).any():
+            raise Exception('riddle in bad state: more than of fixed number')
 
     def _find_locked_tuples(self):
         found_locked_tuple = False
@@ -122,6 +152,7 @@ class SudokuBoard(object):
     def set_new_value(self, row, col, value):
         idx_val = value-1
         self._fixed[row, col, idx_val] = True
+        self._candidates[row, col, :] = False
         self._candidates[row, :, idx_val] = False
         self._candidates[:, col, idx_val] = False
         slice_y, slice_x = self._get_slices(row=row, col=col)
