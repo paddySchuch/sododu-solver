@@ -12,6 +12,7 @@ class SudokuBoard(object):
         self._locked = np.zeros((9, 9), np.bool)
         self._init_board(initial_state=initial_state)
         self._plot_num = plt.figure(figsize=(8, 8)).number
+        self._iteration = 0
 
 
     def _init_board(self, initial_state):
@@ -28,8 +29,11 @@ class SudokuBoard(object):
             success = self.iterate()
             if not success:
                 print('could not find any more. :-(')
+                plt.show()
                 break
             self.show()
+            self._iteration += 1
+        print(f'solved in {self._iteration} iterations :-)')
 
     def _is_solved(self):
         return self._fixed.any(axis=2).all()
@@ -77,13 +81,35 @@ class SudokuBoard(object):
                         cols=unbound_cols,
                         values=locked_values
                     )
-                    print(':-)')
                 if np.sum(locked_in_col) == local_count:
-                    print(':-)')
+                    locked_rows = np.where(locked_in_col)[0]
+                    unbound_rows = np.where(np.logical_not(locked_in_col))[0]
+                    locked_values = np.where(local_candidates.squeeze())[0]
+
+                    locked_cols = np.ones(unbound_cols.shape[0],
+                                          dtype=int) * col
+                    self._locked[locked_rows, col] = True
+                    found_locked_tuple = True
+                    self._remove_candidates(
+                        rows=unbound_rows,
+                        cols=locked_cols,
+                        values=locked_values
+                    )
                     # raise NotImplementedError
                 if np.sum(locked_in_block) == local_count:
-                    print(':-)')
-                    # raise NotImplementedError
+                    locked_rows, locked_cols = np.where(locked_in_block)
+                    locked_rows += slice_y.start
+                    locked_cols += slice_x.start
+                    self._locked[locked_rows, locked_cols] = True
+                    not_locked_in_block = np.logical_not(locked_in_block)
+                    unbound_rows, unbound_cols = np.where(not_locked_in_block)
+                    unbound_rows += slice_y.start
+                    unbound_cols += slice_x.start
+                    self._remove_candidates(
+                        rows=unbound_rows,
+                        cols=unbound_cols,
+                        values=locked_values,
+                    )
                 if found_locked_tuple:
                     return found_locked_tuple
         return found_locked_tuple
@@ -98,11 +124,16 @@ class SudokuBoard(object):
         self._fixed[row, col, idx_val] = True
         self._candidates[row, :, idx_val] = False
         self._candidates[:, col, idx_val] = False
+        slice_y, slice_x = self._get_slices(row=row, col=col)
+        self._candidates[slice_y, slice_x, idx_val] = False
+
+    @staticmethod
+    def _get_slices(row, col):
         idx_block_x = col // 3
         idx_block_y = row // 3
         slice_x = slice(idx_block_x * 3, (idx_block_x + 1) * 3, None)
         slice_y = slice(idx_block_y * 3, (idx_block_y + 1) * 3, None)
-        self._candidates[slice_y, slice_x, idx_val] = False
+        return slice_y, slice_x
 
     def show(self):
         # draw lines
