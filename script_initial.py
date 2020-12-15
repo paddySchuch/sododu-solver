@@ -1,4 +1,4 @@
-
+import json
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -30,10 +30,11 @@ class SudokuBoard(object):
             if not success:
                 print('could not find any more. :-(')
                 plt.show()
-                break
+                return
             self.show()
             self._iteration += 1
         print(f'solved in {self._iteration} iterations :-)')
+        plt.show()
 
     def _is_solved(self):
         return self._fixed.any(axis=2).all()
@@ -85,8 +86,7 @@ class SudokuBoard(object):
                     locked_rows = np.where(locked_in_col)[0]
                     unbound_rows = np.where(np.logical_not(locked_in_col))[0]
                     locked_values = np.where(local_candidates.squeeze())[0]
-
-                    locked_cols = np.ones(unbound_cols.shape[0],
+                    locked_cols = np.ones(unbound_rows.shape[0],
                                           dtype=int) * col
                     self._locked[locked_rows, col] = True
                     found_locked_tuple = True
@@ -210,19 +210,10 @@ class SudokuBoard(object):
         plt.tight_layout()
 
 
-
 if __name__ == '__main__':
-    initial_state = np.asarray([
-        [6, 9, 0, 0, 8, 0, 0, 0, 0],
-        [0, 8, 2, 0, 6, 5, 0, 7, 0],
-        [0, 0, 0, 0, 0, 1, 0, 8, 3],
-        [0, 3, 6, 0, 0, 0, 5, 0, 0],
-        [9, 0, 0, 0, 5, 0, 0 ,0, 2],
-        [0, 0, 5, 0, 0, 0, 1, 6, 0],
-        [2, 5, 0, 6, 0, 0, 0, 0, 0],
-        [0, 6, 0, 3, 1, 0, 4, 9, 0],
-        [0, 0, 0, 0, 9, 0, 0, 2, 6]
-    ])
+    path_sample = './samples/sample_hard.json'
+    with open(path_sample, 'r') as file:
+        initial_state = np.asarray(json.load(file))
 
     board = SudokuBoard(
         initial_state=initial_state
