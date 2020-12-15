@@ -242,7 +242,7 @@ class SudokuBoard(object):
 
 
 if __name__ == '__main__':
-    path_sample = './samples/sample_hard.json'
+    path_sample = './samples/sample_hard_3.json'
     with open(path_sample, 'r') as file:
         initial_state = np.asarray(json.load(file))
 
