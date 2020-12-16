@@ -53,10 +53,49 @@ class SudokuBoard(object):
         if self._check_singles_in_block():
             return True
 
+        # check for single digits in column
+        if self._check_singles_in_col():
+            return True
+
+        # check for single digits in row
+        if self._check_singles_in_row():
+            return True
+
         if self._find_locked_tuples():
             return True
 
+        if self._clean_row_col_locking():
+            return True
+
         return False
+
+    def _clean_row_col_locking(self):
+        found = False
+        for block_y in range(3):
+            slice_y = slice(block_y*3, (block_y+1)*3, None)
+            for block_x in range(3):
+                slice_x = slice(block_x * 3, (block_x + 1) * 3, None)
+                block = self._candidates[slice_y, slice_x]
+                locked_in_row = np.where(block[:, :].any(axis=1).sum(axis=0)== 1)[0]
+                for locked_value in locked_in_row:
+                    locked_row = np.where(block[:, :, locked_value].any(axis=1))[0][0]
+                    idx_row = locked_row + block_y*3
+                    mask = np.ones(9, np.bool)
+                    mask[slice_x] = False
+                    if np.any(self._candidates[idx_row, mask, locked_value]):
+                        self._candidates[idx_row, mask, locked_value] = False
+                        found = True
+                locked_in_col = np.where(block[:, :].any(axis=0).sum(axis=1)== 1)[0]
+                for locked_value in locked_in_col:
+                    locked_col = np.where(block[:, :, locked_value].any(axis=0))[0][0]
+                    idx_col = locked_col + block_x * 3
+                    mask = np.ones(9, np.bool)
+                    mask[slice_y] = False
+                    if np.any(self._candidates[mask, idx_col, locked_value]):
+                        self._candidates[mask, idx_col, locked_value] = False
+                        found = True
+        return found
+
 
     def _check_singles_in_block(self):
         for block_y in range(3):
@@ -73,6 +112,25 @@ class SudokuBoard(object):
                     self.set_new_value(row=idx_row, col=idx_col, value=value+1)
                     return True
         return False
+
+    def _check_singles_in_col(self):
+        singles_in_col = np.where(self._candidates.sum(axis=0) == 1)
+        found = len(singles_in_col[0])
+        for col, value in zip(*singles_in_col):
+            row = np.where(self._candidates[:, col, value])[0][0]
+            self.set_new_value(row=row, col=col, value=value+1)
+            break
+        return found
+
+    def _check_singles_in_row(self):
+        singles_in_row = np.where(self._candidates.sum(axis=1) == 1)
+        found = len(singles_in_row[0])
+        for row, value in zip(*singles_in_row):
+            col = np.where(self._candidates[row, :, value])[0][0]
+            self.set_new_value(row=row, col=col, value=value+1)
+            break
+        return found
+
 
     def _sanity_check(self):
         if (self._fixed.sum(axis=0) > 1).any():
@@ -242,7 +300,7 @@ class SudokuBoard(object):
 
 
 if __name__ == '__main__':
-    path_sample = './samples/sample_hard_3.json'
+    path_sample = './samples/sample_expert.json'
     with open(path_sample, 'r') as file:
         initial_state = np.asarray(json.load(file))
 
