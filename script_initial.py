@@ -14,7 +14,6 @@ class SudokuBoard(object):
         self._plot_num = plt.figure(figsize=(8, 8)).number
         self._iteration = 0
 
-
     def _init_board(self, initial_state):
         idx_row, idx_col = np.where(initial_state > 0)
         values = initial_state[idx_row, idx_col] - 1
@@ -76,18 +75,22 @@ class SudokuBoard(object):
             for block_x in range(3):
                 slice_x = slice(block_x * 3, (block_x + 1) * 3, None)
                 block = self._candidates[slice_y, slice_x]
-                locked_in_row = np.where(block[:, :].any(axis=1).sum(axis=0)== 1)[0]
+                locked_in_row = np.where(block[:, :].any(axis=1).sum(axis=0)
+                                         == 1)[0]
                 for locked_value in locked_in_row:
-                    locked_row = np.where(block[:, :, locked_value].any(axis=1))[0][0]
+                    blocked = block[:, :, locked_value].any(axis=1)
+                    locked_row = np.where(blocked)[0][0]
                     idx_row = locked_row + block_y*3
                     mask = np.ones(9, np.bool)
                     mask[slice_x] = False
                     if np.any(self._candidates[idx_row, mask, locked_value]):
                         self._candidates[idx_row, mask, locked_value] = False
                         found = True
-                locked_in_col = np.where(block[:, :].any(axis=0).sum(axis=1)== 1)[0]
+                blocked = block[:, :].any(axis=0).sum(axis=1) == 1
+                locked_in_col = np.where(blocked)[0]
                 for locked_value in locked_in_col:
-                    locked_col = np.where(block[:, :, locked_value].any(axis=0))[0][0]
+                    blocked = block[:, :, locked_value].any(axis=0)
+                    locked_col = np.where(blocked)[0][0]
                     idx_col = locked_col + block_x * 3
                     mask = np.ones(9, np.bool)
                     mask[slice_y] = False
@@ -95,7 +98,6 @@ class SudokuBoard(object):
                         self._candidates[mask, idx_col, locked_value] = False
                         found = True
         return found
-
 
     def _check_singles_in_block(self):
         for block_y in range(3):
@@ -131,7 +133,6 @@ class SudokuBoard(object):
             break
         return found
 
-
     def _sanity_check(self):
         if (self._fixed.sum(axis=0) > 1).any():
             raise Exception('riddle in bad state: same digits in a row')
@@ -158,10 +159,11 @@ class SudokuBoard(object):
                 slice_x = slice(idx_block_x * 3, (idx_block_x + 1) * 3, None)
                 slice_y = slice(idx_block_y * 3, (idx_block_y + 1) * 3, None)
                 locked_in_block = lock[slice_y, slice_x]
+                locked_values = np.where(local_candidates.squeeze())[0]
                 if np.sum(locked_in_row) == local_count:
                     locked_cols = np.where(locked_in_row)[0]
                     unbound_cols = np.where(np.logical_not(locked_in_row))[0]
-                    locked_values = np.where(local_candidates.squeeze())[0]
+                    # locked_values = np.where(local_candidates.squeeze())[0]
                     locked_rows = np.ones(unbound_cols.shape[0], dtype=int)*row
                     self._locked[row, locked_cols] = True
                     found_locked_tuple = True
@@ -173,7 +175,7 @@ class SudokuBoard(object):
                 if np.sum(locked_in_col) == local_count:
                     locked_rows = np.where(locked_in_col)[0]
                     unbound_rows = np.where(np.logical_not(locked_in_col))[0]
-                    locked_values = np.where(local_candidates.squeeze())[0]
+                    # locked_values = np.where(local_candidates.squeeze())[0]
                     locked_cols = np.ones(unbound_rows.shape[0],
                                           dtype=int) * col
                     self._locked[locked_rows, col] = True
@@ -193,6 +195,7 @@ class SudokuBoard(object):
                     unbound_rows, unbound_cols = np.where(not_locked_in_block)
                     unbound_rows += slice_y.start
                     unbound_cols += slice_x.start
+                    # raise Exception('check locked_values')
                     self._remove_candidates(
                         rows=unbound_rows,
                         cols=unbound_cols,
@@ -205,7 +208,6 @@ class SudokuBoard(object):
     def _remove_candidates(self, rows, cols, values):
         for value in values:
             self._candidates[rows, cols, value] = False
-
 
     def set_new_value(self, row, col, value):
         idx_val = value-1
@@ -243,7 +245,7 @@ class SudokuBoard(object):
                 text = ''
                 for idx, v in enumerate(values, start=1):
                     text += str(v)
-                    if (idx%3 == 0) and (idx != len(values)):
+                    if (idx % 3 == 0) and (idx != len(values)):
                         text += '\n'
                 if self._locked[idx_row, idx_col]:
                     color = 'blue'
@@ -278,11 +280,14 @@ class SudokuBoard(object):
         for idx_row, idx_col, values in zip(*np.where(self._fixed)):
             pos_x = idx_col+0.5
             pos_y = idx_row+0.5
-            plt.text(pos_x, pos_y, values+1, fontsize=48,
-                     verticalalignment='center',
-                     horizontalalignment='center'
+            plt.text(
+                x=pos_x,
+                y=pos_y,
+                s=values+1,
+                fontsize=48,
+                verticalalignment='center',
+                horizontalalignment='center'
             )
-
 
     @staticmethod
     def _draw_empty_board():
@@ -301,6 +306,7 @@ class SudokuBoard(object):
 
 if __name__ == '__main__':
     path_sample = './samples/sample_expert.json'
+    path_sample = './samples/sample_easy_2.json'
     with open(path_sample, 'r') as file:
         initial_state = np.asarray(json.load(file))
 
