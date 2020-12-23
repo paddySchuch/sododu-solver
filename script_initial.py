@@ -1,9 +1,12 @@
+"""script to apply a solver."""
 import json
 import numpy as np
 import matplotlib.pyplot as plt
+import copy
 
 
-class SudokuBoard(object):
+class SudokuBoard:
+    """The board."""
 
     def __init__(self, initial_state):
 
@@ -20,6 +23,11 @@ class SudokuBoard(object):
         self._fixed[idx_row, idx_col, values] = True
 
     def solve(self):
+        """
+        Solve the board.
+
+        :return:
+        """
         self.show()
         self._candidates = self._init_candidates()
         self.show()
@@ -27,7 +35,7 @@ class SudokuBoard(object):
         while not self._is_solved():
             print(f'iteration {self._iteration}')
             self._sanity_check()
-            success = self.iterate()
+            success = self._iterate(allow_bifurcation=True)
             if not success:
                 print('could not find any more. :-(')
                 plt.show()
@@ -40,32 +48,54 @@ class SudokuBoard(object):
     def _is_solved(self):
         return self._fixed.any(axis=2).all()
 
-    def iterate(self):
+    def _iterate(self, allow_bifurcation=True):
+        success = False
         already_found = np.where(self._candidates.sum(axis=2) == 1)
-        if len(already_found[0]) > 0:
+        if (not success) and len(already_found[0]) > 0:
             row = already_found[0][0]
             col = already_found[1][0]
             value = np.where(self._candidates[row, col])[0][0] + 1
             self.set_new_value(row, col, value)
-            return True
-        # check single digits in block
-        if self._check_singles_in_block():
-            return True
+            success = True
 
-        # check for single digits in column
-        if self._check_singles_in_col():
-            return True
+        for func in [
+            self._check_singles_in_block,
+            self._check_singles_in_col,
+            self._check_singles_in_row,
+            self._find_locked_tuples,
+            self._clean_row_col_locking
+        ]:
+            if success:
+                break
+            success = success or func()
+        if allow_bifurcation and (not success):
+            success = success or self.bifurcate()
 
-        # check for single digits in row
-        if self._check_singles_in_row():
-            return True
+        return success
 
-        if self._find_locked_tuples():
-            return True
-
-        if self._clean_row_col_locking():
-            return True
-
+    def bifurcate(self):
+        current_state = np.zeros((9, 9), dtype=int)
+        rows, cols, values = np.where(self._fixed)
+        current_state[rows, cols] = values + 1
+        candidates = np.where(self._candidates)
+        for idx, (row, col, value) in enumerate(zip(*candidates)):
+            print(f'tryining {idx} of {len(candidates[0])}')
+            # bifurcation = SudokuBoard(
+            #     initial_state=current_state
+            # )
+            bifurcation = copy.deepcopy(self)
+            bifurcation.show()
+            bifurcation.set_new_value(row, col, value + 1)
+            bifurcation.show()
+            while bifurcation._iterate(allow_bifurcation=False):
+                bifurcation.show()
+                try:
+                    bifurcation._sanity_check()
+                except:
+                    print('bifurcation worked')
+                    self._remove_candidates([row], [col], [value])
+                    return True
+            print('bifurcation did not help')
         return False
 
     def _clean_row_col_locking(self):
@@ -106,7 +136,7 @@ class SudokuBoard(object):
                 slice_x = slice(block_x * 3, (block_x + 1) * 3, None)
                 candidate_block = self._candidates[slice_y, slice_x]
                 values = np.where(candidate_block.sum(axis=(0, 1)) == 1)[0]
-                if len(values):
+                if len(values) > 0:
                     value = values[0]
                     row, col = np.where(candidate_block[:, :, value])
                     idx_row = row[0] + block_y*3
@@ -140,6 +170,10 @@ class SudokuBoard(object):
             raise Exception('riddle in bad state: same digits in a col')
         if (self._fixed.sum(axis=2) > 1).any():
             raise Exception('riddle in bad state: more than of fixed number')
+        yet_found = self._fixed.any(axis=2)
+        still_candidates = self._candidates.any(axis=2)
+        if not np.logical_or(yet_found, still_candidates).all():
+            raise Exception('riddle in bad state: no more candidates')
 
     def _find_locked_tuples(self):
         found_locked_tuple = False
@@ -243,8 +277,8 @@ class SudokuBoard(object):
                 pos_x = idx_col + 0.5
                 pos_y = idx_row + 0.5
                 text = ''
-                for idx, v in enumerate(values, start=1):
-                    text += str(v)
+                for idx, value in enumerate(values, start=1):
+                    text += str(value)
                     if (idx % 3 == 0) and (idx != len(values)):
                         text += '\n'
                 if self._locked[idx_row, idx_col]:
@@ -305,12 +339,12 @@ class SudokuBoard(object):
 
 
 if __name__ == '__main__':
-    path_sample = './samples/sample_expert.json'
-    path_sample = './samples/sample_easy_2.json'
-    with open(path_sample, 'r') as file:
-        initial_state = np.asarray(json.load(file))
+    PATH_SAMPLE = './samples/sample_expert.json'
+    # PATH_SAMPLE = './samples/sample_easy_2.json'
+    with open(PATH_SAMPLE, 'r') as file:
+        state = np.asarray(json.load(file))
 
     board = SudokuBoard(
-        initial_state=initial_state
+        initial_state=state
     )
     board.solve()
