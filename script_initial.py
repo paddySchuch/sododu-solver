@@ -21,6 +21,7 @@ class SudokuBoard:
         idx_row, idx_col = np.where(initial_state > 0)
         values = initial_state[idx_row, idx_col] - 1
         self._fixed[idx_row, idx_col, values] = True
+        self._candidates = self._init_candidates()
 
     def solve(self):
         """
@@ -28,10 +29,8 @@ class SudokuBoard:
 
         :return:
         """
-        self.show()
-        self._candidates = self._init_candidates()
-        self.show()
 
+        self.show()
         while not self._is_solved():
             print(f'iteration {self._iteration}')
             self._sanity_check()
@@ -43,6 +42,7 @@ class SudokuBoard:
             self.show()
             self._iteration += 1
         print(f'solved in {self._iteration} iterations :-)')
+        self.show()
         plt.show()
 
     def _is_solved(self):
@@ -88,7 +88,7 @@ class SudokuBoard:
             bifurcation.set_new_value(row, col, value + 1)
             bifurcation.show()
             while bifurcation._iterate(allow_bifurcation=False):
-                bifurcation.show()
+                # bifurcation.show()
                 try:
                     bifurcation._sanity_check()
                 except:
@@ -174,6 +174,30 @@ class SudokuBoard:
         still_candidates = self._candidates.any(axis=2)
         if not np.logical_or(yet_found, still_candidates).all():
             raise Exception('riddle in bad state: no more candidates')
+
+        # check for solvable rows
+        cands_in_rows = self._candidates.any(axis=1)
+        fixes_in_rows = self._fixed.any(axis=1)
+        if not np.logical_or(cands_in_rows, fixes_in_rows).all():
+            raise Exception('riddle in bad state: row misses number')
+
+        # check for solvable columns
+        cands_in_cols = self._candidates.any(axis=0)
+        fixes_in_cols = self._fixed.any(axis=0)
+        if not np.logical_or(cands_in_cols, fixes_in_cols).all():
+            raise Exception('riddle in bad state: column misses number')
+
+        for idx_block_y in range(3):
+            slice_y = slice(idx_block_y * 3, (idx_block_y + 1) * 3, None)
+            for idx_block_x in range(3):
+                slice_x = slice(idx_block_x * 3, (idx_block_x + 1) * 3, None)
+                fixed_block = self._fixed[slice_y, slice_x].any(axis=(0, 1))
+                candidates_block = self._candidates[slice_y, slice_x].any(axis=(0, 1))
+                if not np.logical_or(candidates_block, fixed_block).all():
+                    raise('riddle in bad state: all not numbers in block')
+
+
+
 
     def _find_locked_tuples(self):
         found_locked_tuple = False
@@ -339,7 +363,7 @@ class SudokuBoard:
 
 
 if __name__ == '__main__':
-    PATH_SAMPLE = './samples/sample_expert.json'
+    PATH_SAMPLE = './samples/sample_hard_2.json'
     # PATH_SAMPLE = './samples/sample_easy_2.json'
     with open(PATH_SAMPLE, 'r') as file:
         state = np.asarray(json.load(file))
